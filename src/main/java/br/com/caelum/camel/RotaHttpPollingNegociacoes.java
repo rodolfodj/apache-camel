@@ -32,9 +32,39 @@ public class RotaHttpPollingNegociacoes {
 			public void configure() throws Exception {
 
 				from("timer://negociacoes?fixedRate=true&delay=1s&period=360s")
+				.routeId("rota-negociacoes")
 				.setHeader(Exchange.HTTP_METHOD, constant(org.apache.camel.component.http4.HttpMethods.GET))
 				.to("https4://argentumws-spring.herokuapp.com/negociacoes")
 				.convertBodyTo(String.class)
+				.log("${routeId}")
+				/*
+				 * Componente SEDA Staged event-driven architecture
+				 * Uma alternativa ao direct e multicast que utiliza filas dedicadas
+				 .to("seda:db").
+    			 .to("seda:arquivo");
+				 */
+				.multicast()
+				.parallelProcessing()
+					.to("direct:db")
+					.to("direct:arquivo");
+				
+				
+				
+				from("direct:arquivo")
+				.routeId("rota-arquivo")
+				.log("${routeId}")
+				.marshal()
+					.xmljson()
+				.log("${id} - ${body}")
+				.setHeader(Exchange.FILE_NAME, simple("${date:now:YYYYMMdd}.json"))
+				.log("${header.filename}")
+				.to("file:saida")
+				.end();
+				
+				
+				from("direct:db")
+				.routeId("rota-db")
+				.log("${routeId}")
 				.unmarshal(new XStreamDataFormat(xstream))
 				.split(body())
 				.log("${body}")
@@ -50,15 +80,9 @@ public class RotaHttpPollingNegociacoes {
 			      })
 				.setBody(simple("insert into negociacao(preco, quantidade, data) values (${property.preco}, ${property.quantidade}, '${property.data}')"))
 				.log("${body}")
-				.delay(3000)
+				.delay(1000)
 				.to("jdbc:ds")
 				.end();
-//				.marshal()
-//					.xmljson()
-//				.log("${id} - ${body}")
-//				.setHeader(Exchange.FILE_NAME, simple("${date:now:YYYmmdd}.json"))
-//				.log("${header.filename}")
-//				.to("file:saida");
 				
 			}
 			

@@ -16,7 +16,20 @@ public class RotaPedidos {
 			public void configure() throws Exception {
 
 				from("file:pedidos?delay=5s&noop=true").
-			    setProperty("pedidoId", xpath("/pedido/id/text()")).
+			    routeId("rota-pai").
+			    multicast().
+			    parallelProcessing().
+			    to("direct:http").
+			    to("direct:soap");
+				
+				from("direct:soap").
+				routeId("rota-soap").
+				log("${body}").
+				to("mock:soap");
+				
+				from("direct:http").
+				routeId("rota-http").
+				setProperty("pedidoId", xpath("/pedido/id/text()")).
 			    setProperty("clienteId", xpath("/pedido/pagamento/email-titular/text()")).
 			    split().
 			        xpath("/pedido/itens/item").
