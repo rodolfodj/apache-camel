@@ -16,14 +16,19 @@ public class RotaPedidos {
 			public void configure() throws Exception {
 
 				from("file:pedidos?delay=5s&noop=true").
-					split().
-						xpath("/pedido/itens/item").
-					filter().
-						xpath("/item/formato[text()='EBOOK']").
-					marshal().xmljson().
-					log("${id} - ${body}").
-					setHeader(Exchange.FILE_NAME, simple("${file:name.noext}-${header.CamelSplitIndex}.json")).
-				to("file:saida");
+			    setProperty("pedidoId", xpath("/pedido/id/text()")).
+			    setProperty("clienteId", xpath("/pedido/pagamento/email-titular/text()")).
+			    split().
+			        xpath("/pedido/itens/item").
+			    filter().
+			        xpath("/item/formato[text()='EBOOK']").
+			    setProperty("ebookId", xpath("/item/livro/codigo/text()")).
+			    log("${id} \n ${body}").
+			    marshal().
+			        xmljson().
+			    setHeader(Exchange.HTTP_QUERY, 
+			            simple("clienteId=${property.clienteId}&pedidoId=${property.pedidoId}&ebookId=${property.ebookId}")).
+			to("http4://localhost:8080/webservices/ebook/item");
 			}
 			
 		});
