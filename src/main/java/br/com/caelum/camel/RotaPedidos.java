@@ -4,6 +4,7 @@ import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.impl.DefaultCamelContext;
+import org.apache.camel.model.dataformat.JsonLibrary;
 
 public class RotaPedidos {
 
@@ -24,7 +25,9 @@ public class RotaPedidos {
 				
 				from("direct:soap").
 				routeId("rota-soap").
+				to("xslt:pedido-para-soap.xslt").
 				log("${body}").
+				setHeader(Exchange.CONTENT_TYPE, constant("text/xml")).
 				to("mock:soap");
 				
 				from("direct:http").
@@ -38,7 +41,7 @@ public class RotaPedidos {
 			    setProperty("ebookId", xpath("/item/livro/codigo/text()")).
 			    log("${id} \n ${body}").
 			    marshal().
-			        xmljson().
+			    json(JsonLibrary.Jackson).	    
 			    setHeader(Exchange.HTTP_QUERY, 
 			            simple("clienteId=${property.clienteId}&pedidoId=${property.pedidoId}&ebookId=${property.ebookId}")).
 			to("http4://localhost:8080/webservices/ebook/item");
