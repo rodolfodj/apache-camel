@@ -2,6 +2,7 @@ package br.com.caelum.camel;
 
 import org.apache.camel.CamelContext;
 import org.apache.camel.Exchange;
+import org.apache.camel.Processor;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.impl.DefaultCamelContext;
 import org.apache.camel.model.dataformat.JsonLibrary;
@@ -15,13 +16,32 @@ public class RotaPedidos {
 
 			@Override
 			public void configure() throws Exception {
+				
+				errorHandler(
+					    deadLetterChannel("file:erro").
+					        maximumRedeliveries(3).
+					            redeliveryDelay(3000).
+					        onRedelivery(new Processor() {            
+					            @Override
+					            public void process(Exchange exchange) throws Exception {
+					                        int counter = (int) exchange.getIn().getHeader(Exchange.REDELIVERY_COUNTER);
+					                        int max = (int) exchange.getIn().getHeader(Exchange.REDELIVERY_MAX_COUNTER);
+					                        System.out.println("Redelivery - " + counter + "/" + max );
+					                    }
+					        })
+					);
 
 				from("file:pedidos?delay=5s&noop=true").
 			    routeId("rota-pai").
-			    multicast().
-			    parallelProcessing().
-			    to("direct:http").
-			    to("direct:soap");
+			    log("${file:name}"). //logando nome do arquivo
+			    routeId("rota-pedidos").
+			    delay(1000). //esperando 1 segundo
+			    to("validator:pedido.xsd");
+				
+//			    multicast().
+//			    parallelProcessing().
+//			    to("direct:http").
+//			    to("direct:soap");
 				
 				from("direct:soap").
 				routeId("rota-soap").
